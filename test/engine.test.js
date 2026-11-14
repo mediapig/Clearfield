@@ -190,42 +190,58 @@ function mineSignature(state) {
   return state.cells.map((cell) => (cell.mine ? "1" : "0")).join("");
 }
 
-function testShiftChangesMinesAndNumbers() {
+function revealedNumbers(state) {
+  return state.cells.map((cell) => (cell.revealed ? cell.adjacent : -1));
+}
+
+function testShiftKeepsNumbersAndMovesMines() {
+  let moved = 0;
   for (let seed = 1; seed <= 20; seed += 1) {
     const game = createGame({ cols: 8, rows: 8, mines: 10, rng: mulberry32(seed) });
     game.reveal(27);
     assert.strictEqual(game.state.status, "playing");
     assert.strictEqual(mineCount(game.state), 10);
     assertAdjacent(game.state);
-    game.state.cells.forEach((cell) => {
-      if (cell.revealed) assert.strictEqual(cell.mine, false);
-      if (cell.mine) assert.strictEqual(cell.revealed, false);
-    });
 
     const minesBefore = mineSignature(game.state);
-    const numbersBefore = game.state.cells.map((cell) => (cell.revealed ? cell.adjacent : -1));
+    const numbersBefore = revealedNumbers(game.state);
     game.reveal(27);
-    assert.notStrictEqual(mineSignature(game.state), minesBefore);
-    const numbersChanged = numbersBefore.some((number, index) => {
-      return number !== -1 && number !== game.state.cells[index].adjacent;
-    });
-    assert.ok(numbersChanged, `revealed numbers stayed put for seed ${seed}`);
+    assert.deepStrictEqual(revealedNumbers(game.state), numbersBefore);
     assert.strictEqual(mineCount(game.state), 10);
     assert.strictEqual(game.state.status, "playing");
     assertAdjacent(game.state);
     game.state.cells.forEach((cell) => {
       if (cell.revealed) assert.strictEqual(cell.mine, false);
+      if (cell.mine) assert.strictEqual(cell.revealed, false);
     });
+    if (mineSignature(game.state) !== minesBefore) moved += 1;
   }
+  assert.ok(moved >= 15, `mines only moved on ${moved} seeds`);
+}
+
+function testPinnedMinesStayPut() {
+  const layout = [false, true, false, true, true, false, false, false, false];
+  const game = createGame({ cols: 3, rows: 3, layout, rng: mulberry32(2) });
+  game.reveal(0);
+  assert.strictEqual(game.state.status, "playing");
+  assert.strictEqual(game.state.cells[0].adjacent, 3);
+  const before = mineSignature(game.state);
+  game.reveal(0);
+  game.toggleFlag(8);
+  assert.strictEqual(mineSignature(game.state), before);
+  assert.strictEqual(game.state.cells[0].adjacent, 3);
+  assert.strictEqual(game.state.shifts, 0);
 }
 
 function testFlagAlsoShifts() {
   const game = createGame({ cols: 8, rows: 8, mines: 10, rng: mulberry32(9) });
   game.reveal(20);
   const before = mineSignature(game.state);
+  const numbersBefore = revealedNumbers(game.state);
   const hidden = game.state.cells.findIndex((cell) => !cell.revealed);
   game.toggleFlag(hidden);
   assert.notStrictEqual(mineSignature(game.state), before);
+  assert.deepStrictEqual(revealedNumbers(game.state), numbersBefore);
   assert.strictEqual(game.state.cells[hidden].flagged, true);
   assert.strictEqual(mineCount(game.state), 10);
   assertAdjacent(game.state);
@@ -267,4 +283,9 @@ testFloodWinAndLoss();
 testChord();
 testFlagToggle();
 testSolverAlwaysWins();
+testShiftKeepsNumbersAndMovesMines();
+testPinnedMinesStayPut();
+testFlagAlsoShifts();
+testLostBoardStopsShifting();
+testShiftStillReachesAWin();
 console.log("engine tests passed");

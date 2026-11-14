@@ -146,21 +146,173 @@
     indexes.forEach(function (index) {
       state.cells[index].mine = true;
     });
-    countAdjacent(state);
-  }
-
-  function visibleChange(state, mineList, beforeAdjacent) {
-    const mines = new Set(mineList);
-    let changed = 0;
     state.cells.forEach(function (cell, index) {
-      if (!cell.revealed) return;
+      if (cell.revealed) return;
+      if (cell.mine) {
+        cell.adjacent = 0;
+        return;
+      }
       let count = 0;
       neighborIndexes(state.cols, state.rows, index).forEach(function (neighbor) {
-        if (mines.has(neighbor)) count += 1;
+        if (state.cells[neighbor].mine) count += 1;
       });
-      if (count !== beforeAdjacent[index]) changed += 1;
+      cell.adjacent = count;
     });
-    return changed;
+  }
+
+  function respectsRevealedNumbers(state, mineList) {
+    if (mineList.length !== state.mines) return false;
+    const mines = new Set(mineList);
+    for (let index = 0; index < state.cells.length; index += 1) {
+      const cell = state.cells[index];
+      if (!cell.revealed) continue;
+      if (mines.has(index)) return false;
+      let count = 0;
+      const neighbors = neighborIndexes(state.cols, state.rows, index);
+      for (let i = 0; i < neighbors.length; i += 1) {
+        if (mines.has(neighbors[i])) count += 1;
+      }
+      if (count !== cell.adjacent) return false;
+    }
+    return true;
+  }
+
+  function sampleConsistentMines(state, hidden, before) {
+    const frontier = [];
+    const interior = [];
+    hidden.forEach(function (index) {
+      const neighbors = neighborIndexes(state.cols, state.rows, index);
+      let touches = false;
+      for (let i = 0; i < neighbors.length; i += 1) {
+        if (state.cells[neighbors[i]].revealed) {
+          touches = true;
+          break;
+        }
+      }
+      if (touches) frontier.push(index);
+      else interior.push(index);
+    });
+    shuffleInPlace(frontier, state.rng);
+
+    const constraints = [];
+    state.cells.forEach(function (cell, index) {
+      if (!cell.revealed) return;
+      const unknowns = [];
+      neighborIndexes(state.cols, state.rows, index).forEach(function (neighbor) {
+        if (!state.cells[neighbor].revealed) unknowns.push(neighbor);
+      });
+      if (unknowns.length > 0) constraints.push({ cells: unknowns, need: cell.adjacent });
+    });
+
+    const assign = new Array(state.cells.length);
+    let found = null;
+    let nodes = 0;
+
+    function undo(forced) {
+      for (let i = 0; i < forced.length; i += 1) assign[forced[i]] = undefined;
+    }
+
+    function propagate() {
+      const forced = [];
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let c = 0; c < constraints.length; c += 1) {
+          const constraint = constraints[c];
+          let mines = 0;
+          const unknown = [];
+          for (let i = 0; i < constraint.cells.length; i += 1) {
+            const index = constraint.cells[i];
+            const value = assign[index];
+            if (value === 1) mines += 1;
+            else if (value !== 0) unknown.push(index);
+          }
+          if (mines > constraint.need || mines + unknown.length < constraint.need) {
+            undo(forced);
+            return null;
+          }
+          if (unknown.length === 0) continue;
+          const fill = mines === constraint.need ? 0 : mines + unknown.length === constraint.need ? 1 : -1;
+          if (fill === -1) continue;
+          for (let i = 0; i < unknown.length; i += 1) {
+            const index = unknown[i];
+            if (assign[index] !== undefined) continue;
+            assign[index] = fill;
+            forced.push(index);
+            changed = true;
+          }
+        }
+
+        let placed = 0;
+        let unknownFrontier = 0;
+        for (let i = 0; i < frontier.length; i += 1) {
+          const value = assign[frontier[i]];
+          if (value === 1) placed += 1;
+          else if (value !== 0) unknownFrontier += 1;
+        }
+        if (state.mines < placed || state.mines > placed + unknownFrontier + interior.length) {
+          undo(forced);
+          return null;
+        }
+      }
+      return forced;
+    }
+
+    function finish() {
+      const mines = [];
+      for (let i = 0; i < frontier.length; i += 1) {
+        if (assign[frontier[i]] === 1) mines.push(frontier[i]);
+      }
+      const need = state.mines - mines.length;
+      if (need < 0 || need > interior.length) return false;
+      const attempts = Math.max(1, Math.min(12, interior.length + 1));
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        const pool = interior.slice();
+        shuffleInPlace(pool, state.rng);
+        const chosen = mines.concat(pool.slice(0, need));
+        chosen.sort(function (a, b) {
+          return a - b;
+        });
+        if (!sameIndexes(before, chosen) && respectsRevealedNumbers(state, chosen)) {
+          found = chosen;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function dfs() {
+      if (found || nodes > 8000) return Boolean(found);
+      nodes += 1;
+      const forced = propagate();
+      if (!forced) return false;
+      let next = -1;
+      for (let i = 0; i < frontier.length; i += 1) {
+        if (assign[frontier[i]] === undefined) {
+          next = frontier[i];
+          break;
+        }
+      }
+      if (next === -1) {
+        const ok = finish();
+        undo(forced);
+        return ok;
+      }
+      const choices = state.rng() < 0.5 ? [1, 0] : [0, 1];
+      for (let i = 0; i < choices.length; i += 1) {
+        assign[next] = choices[i];
+        if (dfs()) {
+          undo(forced);
+          return true;
+        }
+        assign[next] = undefined;
+      }
+      undo(forced);
+      return false;
+    }
+
+    dfs();
+    return found;
   }
 
   function reshuffle(state) {
@@ -172,28 +324,15 @@
     if (hidden.length <= state.mines) return;
 
     const before = mineIndexes(state);
-    const beforeAdjacent = state.cells.map(function (cell) {
-      return cell.adjacent;
+    const next = sampleConsistentMines(state, hidden, before);
+    if (!next) return;
+    const revealedNumbers = state.cells.map(function (cell) {
+      return cell.revealed ? cell.adjacent : null;
     });
-    let best = before;
-    let bestRank = -1;
-    for (let attempt = 0; attempt < 24; attempt += 1) {
-      const pool = hidden.slice();
-      shuffleInPlace(pool, state.rng);
-      const next = pool.slice(0, state.mines);
-      next.sort(function (a, b) {
-        return a - b;
-      });
-      const changed = visibleChange(state, next, beforeAdjacent);
-      const different = sameIndexes(before, next) ? 0 : 1;
-      const rank = changed * 10 + different;
-      if (rank > bestRank) {
-        bestRank = rank;
-        best = next;
-        if (changed > 0 && different === 1) break;
-      }
-    }
-    applyMines(state, best);
+    applyMines(state, next);
+    revealedNumbers.forEach(function (number, index) {
+      if (number !== null) state.cells[index].adjacent = number;
+    });
     state.shifts += 1;
   }
 

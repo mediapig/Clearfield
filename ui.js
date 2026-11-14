@@ -145,11 +145,11 @@
     if (state.status === "ready") {
       return state.flags
         ? "已插 " + state.flags + " 面旗。点一格开始。"
-        : "点一格开始。第一下会打开一块空地，之后每次点击都会重新分布。";
+        : "点一格开始。第一下会打开一块空地。之后没翻开的雷会在不改数字的前提下移动。";
     }
     if (state.status === "playing") {
       const left = state.cells.length - state.mines - state.revealedSafe;
-      return "还剩 " + left + " 个安全格。这一下之后，雷和数字已经变了。";
+      return "还剩 " + left + " 个安全格。已翻开的数字不变。";
     }
     if (state.status === "won") {
       const record = newRecord ? "新纪录。" : "";

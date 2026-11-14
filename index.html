@@ -51,9 +51,9 @@
         <div id="board" class="board" role="group" aria-label="雷区"></div>
       </div>
 
-      <p id="status" class="status" role="status">点一格开始。第一下会打开一块空地，之后每次点击都会重新分布。</p>
+      <p id="status" class="status" role="status">点一格开始。第一下会打开一块空地。之后没翻开的雷会在不改数字的前提下移动。</p>
       <p id="best" class="best">还没有纪录</p>
-      <p class="help">每点击一次，未翻开的雷都会重新散布，已经翻开的数字也会变。这一下按点击前的局面判定。左键翻开，右键插旗。数字上双击或按中键，会按当前数字翻开周围。</p>
+      <p class="help">已经翻开的数字不会变。每次点击后，没翻开的雷会在仍然满足这些数字时随机移动，对不上就保持原样。左键翻开，右键插旗。数字上双击或按中键，会按当前数字翻开周围。</p>
     </section>
   </main>
   <script src="engine.js"></script>
