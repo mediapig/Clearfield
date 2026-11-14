@@ -28,7 +28,6 @@
   let faceDown = false;
   let holdTimer = null;
   let suppressIndex = -1;
-  let openClickTimer = null;
   let focusIndex = 0;
 
   function pad(value) {
@@ -239,13 +238,7 @@
     buttons[index].focus();
   }
 
-  function cancelOpenClick() {
-    clearTimeout(openClickTimer);
-    openClickTimer = null;
-  }
-
   function start() {
-    cancelOpenClick();
     resetClock();
     focusIndex = 0;
     game = Clearfield.createGame({
@@ -343,46 +336,27 @@
       suppressIndex = -1;
       return;
     }
+    if (event.detail > 1) return;
     if (inputMode === "flag") {
-      cancelOpenClick();
       game.toggleFlag(index);
       afterMove();
       return;
     }
-    if (game.state.cells[index].revealed) {
-      cancelOpenClick();
-      openClickTimer = setTimeout(function () {
-        openClickTimer = null;
-        game.reveal(index);
-        afterMove();
-      }, 200);
-      return;
-    }
-    cancelOpenClick();
-    game.reveal(index);
+    if (game.state.cells[index].revealed) game.chord(index);
+    else game.reveal(index);
     afterMove();
   });
 
   board.addEventListener("contextmenu", (event) => {
     const index = cellIndex(event.target);
-    cancelOpenClick();
     event.preventDefault();
     if (index < 0) return;
     game.toggleFlag(index);
     afterMove();
   });
 
-  board.addEventListener("dblclick", (event) => {
-    const index = cellIndex(event.target);
-    cancelOpenClick();
-    if (index < 0 || !game.state.cells[index].revealed) return;
-    game.chord(index);
-    afterMove();
-  });
-
   board.addEventListener("auxclick", (event) => {
     const index = cellIndex(event.target);
-    cancelOpenClick();
     if (index < 0 || event.button !== 1) return;
     event.preventDefault();
     if (game.state.cells[index].revealed) game.chord(index);
@@ -408,6 +382,7 @@
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (inputMode === "flag") game.toggleFlag(index);
+      else if (game.state.cells[index].revealed) game.chord(index);
       else game.reveal(index);
       afterMove();
     } else if (event.key === "f" || event.key === "F") {
