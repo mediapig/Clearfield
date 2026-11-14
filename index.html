@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clearfield · 扫雷</title>
+  <meta name="description" content="Clearfield，一块待清扫的雷区。">
+  <link rel="icon" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="mast">
+      <p class="eyebrow">Field clearance</p>
+      <h1>Clearfield</h1>
+      <p class="lede">把这块地清干净。</p>
+    </header>
+
+    <section class="panel" aria-label="扫雷">
+      <div class="diffs">
+        <button type="button" class="diff is-on" data-diff="beginner">初级</button>
+        <button type="button" class="diff" data-diff="intermediate">中级</button>
+        <button type="button" class="diff" data-diff="expert">高级</button>
+      </div>
+
+      <form id="custom" class="custom">
+        <label>列 <input id="cols" type="number" min="2" max="60" value="9" inputmode="numeric"></label>
+        <label>行 <input id="rows" type="number" min="2" max="40" value="9" inputmode="numeric"></label>
+        <label>雷 <input id="mines" type="number" min="1" max="2399" value="10" inputmode="numeric"></label>
+        <button type="submit">自定义</button>
+      </form>
+
+      <div class="hud">
+        <div class="readout">
+          <span class="readout-label">剩余</span>
+          <span id="mine-count" class="digits">010</span>
+        </div>
+        <button type="button" id="reset" class="face" aria-label="重新开始">◡</button>
+        <div class="readout">
+          <span class="readout-label">时间</span>
+          <span id="timer" class="digits">000</span>
+        </div>
+      </div>
+
+      <div class="modes">
+        <button type="button" id="mode-reveal" class="is-on" aria-pressed="true">翻开</button>
+        <button type="button" id="mode-flag" aria-pressed="false">插旗</button>
+      </div>
+
+      <div class="board-scroll">
+        <div id="board" class="board" role="group" aria-label="雷区"></div>
+      </div>
+
+      <p id="status" class="status" role="status">点一格开始。第一下会打开一块空地，之后每次点击都会重新分布。</p>
+      <p id="best" class="best">还没有纪录</p>
+      <p class="help">每点击一次，未翻开的雷都会重新散布，已经翻开的数字也会变。这一下按点击前的局面判定。左键翻开，右键插旗。数字上双击或按中键，会按当前数字翻开周围。</p>
+    </section>
+  </main>
+  <script src="engine.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
